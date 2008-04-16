@@ -30,22 +30,22 @@ sub prepare {
 
 		# Save everything after '--'.
 		elsif($arg eq '--') {
-			push @rest, @ARGV;
+			push @rest, @argv;
 			last;
 		}
 
 		# Get long options.
-		elsif($arg =~ /^--(.+)$/) {
-			my $key = $1;
+		elsif($arg =~ /^--(.+?)(?:=(.*))?$/) {
+			my ($key, $value) = ($1, $2);
 			my $option = $self->option($key);
 
 			if($option->[2]) {
-				my $value = shift @ARGV;
+				$value = shift @argv unless defined $value;
 
 				die $self->usage("Missing argument for option --$key.")
 					unless(defined $value);
 
-				$option{$key} = $value for(@{$option->[0]});
+				$option{$_} = $value for(@{$option->[0]});
 			}
 			else {
 				$option{$_} = !0 for(@{$option->[0]});
@@ -68,7 +68,7 @@ sub prepare {
 						last;
 					}
 					else {
-						my $value = shift @ARGV;
+						my $value = shift @argv;
 
 						die $self->usage("Missing argument for option -$key.")
 							unless(defined $value);
@@ -145,3 +145,17 @@ sub run {
 }
 
 !0;
+
+__END__
+
+=head1 NAME
+
+CLI::Application - create command line tools with less code
+
+=head1 SYNOPSIS
+
+	use CLI::Application;
+
+
+
+=cut
