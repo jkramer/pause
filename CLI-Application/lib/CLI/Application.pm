@@ -162,8 +162,8 @@ CLI::Application - create command line tools with less code
 		version => '0.01',
 		fallback => 'help',
 		options => [
-			[ [ qw( v verbose ), 'Be more verbose.' ] ],
-			[ [ qw( f file ), 'Use the given file.', 'string' ] ],
+			[ [ qw( v verbose ) ], 'Be more verbose.' ],
+			[ [ qw( f file ) ], 'Use the given file.', 'string' ],
 		],
 	);
 
