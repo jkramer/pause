@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 19;
+use Test::More tests => 35;
 
 use CLI::Application;
 
@@ -17,14 +17,20 @@ my $cli = new CLI::Application(
 	],
 );
 
-ok($cli->prepare(qw()), 'first prepare');
-ok($cli->run, 'first run');
+ok($cli->prepare(qw()), '1st prepare');
+ok($cli->run, '1st run');
 
-ok($cli->prepare(qw(--test --value=foo test)), 'second prepare');
-ok($cli->run, 'second run');
+ok($cli->prepare(qw(--test --value=foo test)), '2nd prepare');
+ok($cli->run, '2nd run');
 
-ok($cli->prepare(qw(-t -v foo test)), 'second prepare');
-ok($cli->run, 'third run');
+ok($cli->prepare(qw(-t -v foo test)), '3rd prepare');
+ok($cli->run, '3rd run');
+
+ok($cli->prepare(qw(-t -vfoo test)), '4th prepare');
+ok($cli->run, '4th run');
+
+ok($cli->prepare(qw(-tvfoo test)), '5th prepare');
+ok($cli->run, '5th run');
 
 sub main {
 	my ($action, $options, $arguments) = @_;

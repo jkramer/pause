@@ -156,6 +156,110 @@ CLI::Application - create command line tools with less code
 
 	use CLI::Application;
 
+	my $cli = new CLI::Application(
+		name => 'test',
+		version => '0.01',
+		fallback => 'help',
+		options => [
+			[ [ qw( v verbose ), 'Be more verbose.' ] ],
+			[ [ qw( f file ), 'Use the given file.', 'string' ] ],
+		],
+	);
 
+	$cli->prepare(@ARGV);
+
+	$cli->run;
+
+	sub help {
+		warn "Usage: $0 [-v|--verbose] [-f|--file some-file] foo|bar|help\n";
+	}
+
+	sub foo {
+		my ($action, $options, $arguments) = @_;
+
+		if($options->{verbose}) {
+			warn "Being verbose!\n";
+		}
+
+		warn "Using file $options->{file}.\n" if $options->{file};
+		warn "Action is 'foo'.\n";
+	}
+
+	sub bar {
+		my ($action, $options, $arguments) = @_;
+
+		if($options->{verbose}) {
+			warn "Being verbose!\n";
+		}
+
+		warn "Using file $options->{file}.\n" if $options->{file};
+		warn "Action is 'bar'.\n";
+	}
+
+=head1 DESCRIPTION
+
+This module aims to reduce the overhead of writing/using option parsers for
+command line tools.
+
+=head1 METHODS
+
+=over 4
+
+=item B<new>(...)
+
+Creates a new application object. Takes a hash with the needed configuration as
+arguments. Following options are supported at the moment.
+
+=over 4
+
+=item * B<name>
+
+This is the name of your application. It is currently not really used, but this
+module probably will be able to generate usage and help messages using it.
+
+=item * B<version>
+
+See B<name>.
+
+=item * B<fallback>
+
+Allows you to specify a default action to call if no non-option argument is
+given.
+
+=item * B<options>
+
+Array of arrays specifying the allowed options. Each array should have two or
+three elements. The first element is another array with the possibly variations
+of the option, without the dashes. Single characters are taken as short options
+(single dash), anything long will be used as long option (two dashes). The
+second element is a short line of text describing what the option is meant for.
+This will be used in future help messages (see B<name> and B<version>). If
+there is a third element, the application will expect an argument for the
+option. Currently anything true works as third element. In future versions,
+there will probably be a way to do argument validation using a special string
+instead. See B<SYNOPSIS> for an example.
+
+=back
+
+=item B<prepare>(list of arguments, usually @ARGV)
+
+This method parses the options from the given list of command line arguments.
+It will die if there are problems (unknown option, missing argument, ...).
+
+=item B<run>(no arguments)
+
+Runs the application. Actually, this simply calls the appropriate function
+based on the arguments and the fallback option.
+
+=back
+
+=head1 BUGS
+
+If there are bugs, please report them.
+
+=head1 COPYRIGHT
+
+Copyright (C) 2008 by Jonas Kramer <jkramer@pause.org>. Published under the
+terms of the Artistic License 2.0.
 
 =cut
