@@ -6,6 +6,7 @@ use warnings;
 
 no strict 'refs';
 
+our $VERSION = '0.01';
 our $data = undef;
 
 
