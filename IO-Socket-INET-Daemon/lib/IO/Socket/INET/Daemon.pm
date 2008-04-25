@@ -50,9 +50,10 @@ sub run {
 
 	# The main loop.
 	until($self->{stop}) {
+		$self->call('tick', undef);
 
 		# Get readable sockets.
-		for my $io ($select->can_read) {
+		for my $io ($select->can_read($self->{timeout})) {
 
 			# If the server socket is readable, get the pending incoming
 			# connection, call the callback and add the peer to our list.
@@ -233,13 +234,16 @@ L<IO::Select>.
 
 =item B<callback>
 
-A hash with function references assigned to callback names.  Currently, three
+A hash with function references assigned to callback names.  Currently, four
 callbacks are supported. "add" is called when a new connection was accepted. If
 it returns a false value, the connection is kicked again right away. "remove"
 is called when a connection got lost. "data" is called when there's pending
 data on a connection. If the callback function returns false, the connection is
-removed afterwards. All callbacks are called with the peer socket and the host
-object itself as argument (L<IO::Socket::INET>).
+removed afterwards. "tick" is called at the beginning of every cycle, that
+means at least every B<timeout> seconds, or earlier if the B<select> returned
+early because of incoming traffic. All callbacks except "tick" are called with
+the peer socket and the daemon object itself as argument (L<IO::Socket::INET>).
+Tick get's B<undef> instead of the peer socket.
 
 =back
 
@@ -285,11 +289,6 @@ much bugs in it. Just try it out and tell me if it's broken.
 =over 4
 
 =item * Add tests to the package.
-
-=item * Add a "tick" callback that is called after every cycle (for maintenance
-tasks).
-
-=item * ...
 
 =back
 
