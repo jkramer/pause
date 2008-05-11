@@ -4,6 +4,8 @@ use Test::More tests => 11;
 use IO::Socket::INET::Daemon;
 use IO::Socket::INET;
 
+use POSIX ":sys_wait_h";
+
 
 my $host = new IO::Socket::INET::Daemon(
 	port => 5000,  
