@@ -7,8 +7,10 @@ use warnings;
 use Carp;
 use IO::File;
 
+our $VERSION = '0.01';
 
-sub TIEHASH ($$&;&) {
+
+sub TIEHASH {
 	my ($class, $path, $parse, $format) = @_;
 
 	croak "No parse callback.\n" unless $parse;
@@ -29,11 +31,8 @@ sub TIEHASH ($$&;&) {
 
 			my ($key, $value) = &{$parse}($line);
 
-			if(defined $key) {
-				$self->{hash}->{$key} = $value;
-			}
-			else {
-				carp "Line $. of file $path doesn't match syntax.\n";
+			if(defined $key and length $key) {
+				$self->{hash}->{$key} = $value if(length $key);
 			}
 		}
 
@@ -79,7 +78,8 @@ sub CLEAR {
 
 sub FIRSTKEY {
 	my ($self) = @_;
-	return (keys %{$self->{hash}})[0];
+	my ($key) = each %{$self->{hash}};
+	return $key;
 }
 
 
@@ -100,7 +100,7 @@ sub _store {
 		my $io = new IO::File('>' . $path) or croak "Can't write $path. $!.\n";
 
 		while(my ($key, $value) = each %{$self->{hash}}) {
-			$io->say(&{$self->{format}}($key, $value);
+			$io->say(&{$self->{format}}($key, $value));
 		}
 
 		$io->close;
