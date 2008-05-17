@@ -139,10 +139,10 @@ TIe::File::Hashify - Parse a file and tie the result to a hash.
 	my $path = "$ENV{HOME}/.some.rc";
 
 	# Parse lines like 'foo = bar':
-	sub { $_[0] =~ /^\s*(\S+)\s*=\s*(.*?)\s*$/ };
+	sub parse { $_[0] =~ /^\s*(\S+)\s*=\s*(.*?)\s*$/ };
 
 	# Format pairs as 'key = value':
-	sub { "$_[0] = $_[1]" };
+	sub format { "$_[0] = $_[1]" };
 
 	tie(%rc, 'Tie::File::Hashify', $path, \&parse, \&format);
 
