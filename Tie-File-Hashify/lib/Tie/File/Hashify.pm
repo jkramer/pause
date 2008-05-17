@@ -66,12 +66,18 @@ sub EXISTS {
 
 sub DELETE {
 	my ($self, $key) = @_;
+
+	$self->{dirty} = !0;
+
 	return delete($self->{hash}->{$key});
 }
 
 
 sub CLEAR {
 	my ($self) = @_;
+
+	$self->{dirty} = !0;
+
 	%{$self->{hash}} = ();
 }
 
