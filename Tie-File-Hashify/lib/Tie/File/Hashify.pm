@@ -185,6 +185,16 @@ you get a plain hash that does nothing special.
 
 =back
 
+=head1 TODO
+
+=over 4
+
+=item * Allow regex instead of parse callback for parsing.
+
+=item * Allow format instead of format callback for formatting.
+
+=back
+
 =head1 COPYRIGHT
 
 Copyright (C) 2008 by Jonas Kramer <jkramer@cpan.org>. Published under the
