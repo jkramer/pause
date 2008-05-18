@@ -13,23 +13,36 @@ our $VERSION = '0.02';
 sub TIEHASH {
 	my ($class, $path, $parse, $format) = @_;
 
-	croak "No parse callback.\n" unless $parse;
-
 	my $self = bless {
 		hash => {},
-		parse => $parse,
 		format => $format,
 		path => $path,
 		dirty => 0,
 	}, $class;
 
-	if(-e $path) {
+	if($path and -e $path and $parse) {
 		my $io = new IO::File($path) or croak "Can't read $path. $!.\n";
 
 		while(my $line = $io->getline) {
 			next unless defined $line and length($line);
 
-			my ($key, $value) = &{$parse}($line);
+			my ($key, $value);
+
+			# Use callback for parsing.
+			if(ref($parse) eq 'CODE') {
+				($key, $value) = &{$parse}($line);
+			}
+
+			# Parse line using a regular expression.
+			elsif(ref($parse) eq '' or uc(ref($parse)) eq 'REGEXP') {
+				my $re = ref($parse) ? $parse : qr/^$parse$/;
+				($key, $value) = ($line =~ $re);
+			}
+
+			# Croak.
+			else {
+				croak 'Can\'t use ', lc(ref($parse)), " for parsing.\n";
+			}
 
 			if(defined $key and length $key) {
 				$self->{hash}->{$key} = $value if(length $key);
@@ -98,18 +111,53 @@ sub NEXTKEY {
 }
 
 
+sub SCALAR {
+	my ($self) = @_;
+
+	my $format = $self->{format};
+
+	if(defined $format) {
+		my $text = '';
+
+		values %{$self->{hash}};
+
+		while(my ($key, $value) = each %{$self->{hash}}) {
+			# Format using callback.
+			if(ref($format) eq 'CODE') {
+				$text .= &{$format}($key, $value) . "\n";
+			}
+			
+			# Format using sprintf and a format string.
+			elsif(ref($format) eq '') {
+				$text .= sprintf($format, $key, $value) . "\n";
+			}
+
+			# Croak.
+			else {
+				croak 'Can\'t use ' . ref($format) . " as format.\n";
+			}
+		}
+
+		return $text;
+	}
+
+	else {
+		return %{$self->{hash}};
+	}
+}
+
+
 sub _store {
 	my ($self) = @_;
 
-	if($self->{dirty} and $self->{format}) {
-		my $path = $self->{path};
+	my $path = $self->{path};
+
+	if($path and $self->{dirty} and $self->{format}) {
 		my $io = new IO::File('>' . $path) or croak "Can't write $path. $!.\n";
 
-		while(my ($key, $value) = each %{$self->{hash}}) {
-			$io->say(&{$self->{format}}($key, $value));
-		}
-
+		$io->print($self->SCALAR);
 		$io->close;
+
 		$self->{dirty} = 0;
 	}
 }
@@ -163,10 +211,11 @@ TIe::File::Hashify - Parse a file and tie the result to a hash.
 =head1 DESCRIPTION
 
 This module helps parsing simple text files and mapping it's contents to a
-plain hash. It reads a file line by line and calls a callback you provide to
-parse a key and a value from the file. The key/value pairs are then available
-through the generated hash. You can also provide another callback that formats
-a key/value pair to a line to be stored back to the file.
+plain hash. It reads a file line by line and uses a callback or expression you
+provide to parse a key and a value from it. The key/value pairs are then
+available through the generated hash. You can also provide another callback or
+format string that formats a key/value pair to a line to be stored back to the
+file.
 
 =head1 METHODS
 
@@ -174,30 +223,25 @@ a key/value pair to a line to be stored back to the file.
 
 =item B<tie>(%hash, $path, \&parse, \&format)
 
-The first argument is the hash you want to tie to the file. The second one is
+The third argument (after the hash itself and the package name of course) is
 the path to a file. The file does not really have to exist, but using a path to
 a non-existent file does only make sense if you provide a format-callback to
-write a new file. The third argument is the callback function that is called
-for every line of the parsed file. It gets the currently read line as argument
-and should return two scalars (key and value). If the first return value (the
-key) is B<undef> or empty (''), nothing is added to the hash.
-The fourth argument is another callback. If it's provided, it will be called
-for every key/value pair in the hash when the tied hash is untied. It gets the
-key and the value of the current pair as arguments and should return a string,
-which then will be saved to the file.
+write a new file.
 
-The parse callback and the format callback may be omitted. If you omit both,
-you get a plain hash that does nothing special.
+The third argument is used for parsing the file. It may either be code
+reference, which will be called with a line as argument and should return the
+key and the value for the hash element; or it may be a string or compiled
+regular expression (qr//). The expression will be applied to every line and $1
+and $2 will be used as key/value afterwards.
 
-=back
+The fourth argument is used for formatting the hash into something that can be
+written back to the file. It may be a code reference that takes two arguments
+(key and value) as arguments and returns a string (without trailing line-break
+- it will be added automatically), or a format string that is forwarded to
+B<sprintf> together with the key and the value.
 
-=head1 TODO
-
-=over 4
-
-=item * Allow regex instead of parse callback for parsing.
-
-=item * Allow format instead of format callback for formatting.
+All arguments (B<path>, B<parse>, B<format>) each may be omitted / undef. If
+you omit all of them, you get a plain normal hash.
 
 =back
 
