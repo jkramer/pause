@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 2;
 
 use IO::File;
 use Tie::File::Hashify;
