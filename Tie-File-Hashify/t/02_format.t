@@ -11,7 +11,7 @@ use Tie::File::Hashify;
 my %rc;
 my $ok;
 
-$ok = tie(%rc, 'Tie::File::Hashify', undef, undef, '- %s => %s');
+$ok = tie(%rc, 'Tie::File::Hashify', undef, format => '- %s => %s');
 
 ok($ok, 'tie worked');
 

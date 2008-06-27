@@ -11,16 +11,18 @@ our $VERSION = '0.02';
 
 
 sub TIEHASH {
-	my ($class, $path, $parse, $format) = @_;
+	my ($class, $path, %options) = @_;
 
 	my $self = bless {
 		hash => {},
-		format => $format,
+		format => $options{format},
+		parse => $options{parse},
 		path => $path,
+		ro => $options{ro},
 		dirty => 0,
 	}, $class;
 
-	if($path and -e $path and $parse) {
+	if($path and -e $path and $options{parse}) {
 		my $io = new IO::File($path) or croak "Can't read $path. $!.\n";
 
 		while(my $line = $io->getline) {
@@ -29,19 +31,19 @@ sub TIEHASH {
 			my ($key, $value);
 
 			# Use callback for parsing.
-			if(ref($parse) eq 'CODE') {
-				($key, $value) = &{$parse}($line);
+			if(ref($options{parse}) eq 'CODE') {
+				($key, $value) = &{$options{parse}}($line);
 			}
 
 			# Parse line using a regular expression.
-			elsif(ref($parse) eq '' or uc(ref($parse)) eq 'REGEXP') {
-				my $re = ref($parse) ? $parse : qr/^$parse$/;
+			elsif(ref($options{parse}) eq '' or uc(ref($options{parse})) eq 'REGEXP') {
+				my $re = ref($options{parse}) ? $options{parse} : qr/^$options{parse}$/;
 				($key, $value) = ($line =~ $re);
 			}
 
 			# Croak.
 			else {
-				croak 'Can\'t use ', lc(ref($parse)), " for parsing.\n";
+				croak 'Can\'t use ', lc(ref($options{parse})), " for parsing.\n";
 			}
 
 			if(defined $key and length $key) {
@@ -65,6 +67,8 @@ sub FETCH {
 sub STORE {
 	my ($self, $key, $value) = @_;
 
+	croak "Can't store in read-only mode" if($self->{ro});
+
 	$self->{dirty} = !0;
 
 	return $self->{hash}->{$key} = $value;
@@ -80,6 +84,8 @@ sub EXISTS {
 sub DELETE {
 	my ($self, $key) = @_;
 
+	croak "Can't delete in read-only mode" if($self->{ro});
+
 	$self->{dirty} = !0;
 
 	return delete($self->{hash}->{$key});
@@ -88,6 +94,8 @@ sub DELETE {
 
 sub CLEAR {
 	my ($self) = @_;
+
+	croak "Can't clear in read-only mode" if($self->{ro});
 
 	$self->{dirty} = !0;
 
@@ -126,7 +134,7 @@ sub SCALAR {
 			if(ref($format) eq 'CODE') {
 				$text .= &{$format}($key, $value) . "\n";
 			}
-			
+
 			# Format using sprintf and a format string.
 			elsif(ref($format) eq '') {
 				$text .= sprintf($format, $key, $value) . "\n";
@@ -152,7 +160,7 @@ sub _store {
 
 	my $path = $self->{path};
 
-	if($path and $self->{dirty} and $self->{format}) {
+	if($path and $self->{dirty} and $self->{format} and !$self->{ro}) {
 		my $io = new IO::File('>' . $path) or croak "Can't write $path. $!.\n";
 
 		$io->print($self->SCALAR);

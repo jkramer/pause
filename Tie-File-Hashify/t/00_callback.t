@@ -21,8 +21,8 @@ my $ok = tie(
 	%rc,
 	'Tie::File::Hashify',
 	$rcpath,
-	sub { $_[0] =~ /^\s*(\S+)\s*=\s*(.*?)\s*$/ },
-	sub { "$_[0] = $_[1]" }
+	parse => sub { $_[0] =~ /^\s*(\S+)\s*=\s*(.*?)\s*$/ },
+	format => sub { "$_[0] = $_[1]" }
 );
 
 ok($ok, 'tie hash');
@@ -42,7 +42,7 @@ $ok = tie(
 	%rc,
 	'Tie::File::Hashify',
 	$rcpath,
-	sub { $_[0] =~ /^\s*(\S+)\s*=\s*(.*?)\s*$/ },
+	parse => sub { $_[0] =~ /^\s*(\S+)\s*=\s*(.*?)\s*$/ },
 );
 
 ok($ok, 'reopen file');
