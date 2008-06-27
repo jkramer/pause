@@ -7,7 +7,7 @@ use warnings;
 use Carp;
 use IO::File;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 
 sub TIEHASH {
