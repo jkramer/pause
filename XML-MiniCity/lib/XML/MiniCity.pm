@@ -68,6 +68,9 @@ sub AUTOLOAD {
 1
 
 
+__END__
+
+
 =head1 NAME
 
 XML::MiniCity
