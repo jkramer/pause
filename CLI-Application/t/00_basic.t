@@ -13,11 +13,12 @@ my $cli = new CLI::Application(
 	fallback => 'main',
 	options => [
 		[ [ qw( t test ) ], 'Test option.' ],
-		[ [ qw( v value ) ], 'Option with argument.', 'string' ],
+		[ [ qw( v value ) ], 'Option with argument.', !0 ],
 	],
 );
 
 ok($cli->prepare(qw()), '1st prepare');
+
 ok($cli->run, '1st run');
 
 ok($cli->prepare(qw(--test --value=foo test)), '2nd prepare');

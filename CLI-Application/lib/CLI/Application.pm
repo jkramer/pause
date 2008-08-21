@@ -7,7 +7,7 @@ use warnings;
 no strict 'refs';
 
 our $VERSION = '0.01';
-our $data = undef;
+my $data;
 
 
 sub new {
@@ -23,7 +23,9 @@ sub prepare {
 	my @rest;
 	my %option;
 
+
 	while(my $arg = shift(@argv)) {
+
 		# Save non-option arguments.
 		if($arg =~ /^[^-]/) {
 			push @rest, $arg;
@@ -44,7 +46,13 @@ sub prepare {
 				$value = shift @argv unless defined $value;
 
 				die $self->usage("Missing argument for option --$key.")
-					unless(defined $value);
+					unless defined $value;
+
+				if(!$self->_validate($option->[2], $value)) {
+					my $error = "Wrong argument for option --$key.";
+					$error .= ' ' . $option->[3] if($option->[3]);
+					die $self->usage($error);
+				}
 
 				$option{$_} = $value for(@{$option->[0]});
 			}
@@ -74,6 +82,12 @@ sub prepare {
 						die $self->usage("Missing argument for option -$key.")
 							unless(defined $value);
 
+						if(!$self->_validate($option->[2], $value)) {
+							my $error = "Wrong argument for option -$key.";
+							$error .= ' ' . $option->[3] if($option->[3]);
+							die $self->usage($error);
+						}
+
 						$option{$_} = $value for(@{$option->[0]});
 					}
 				}
@@ -82,6 +96,7 @@ sub prepare {
 				}
 			}
 		}
+
 		else {
 			die "Don't know what to do with '$arg'.\n";
 		}
@@ -105,6 +120,7 @@ sub prepare {
 	$self->{rest} = \@rest;
 }
 
+
 sub option {
 	my ($self, $needle) = @_;
 
@@ -115,13 +131,94 @@ sub option {
 	}
 
 	die $self->usage("Unknown option '$needle'.\n");
-	exit -1;
 }
 
 
 sub usage {
 	my ($self, @message) = @_;
-	return "@message\n";
+
+	my $usage = $self->_usage;
+
+	return "@message\n$usage\n";
+}
+
+
+sub _usage {
+	my ($self) = @_;
+
+	my $short = $0;
+
+	for my $option (@{$self->{options}}) {
+		$short .= ' [' . $self->_format($option) . ']';
+	}
+
+	$short .= ' [action]';
+
+	my $usage = <<USAGE;
+
+Usage: $short
+
+USAGE
+}
+
+
+sub _format {
+	my ($self, $option) = @_;
+
+	my $desc = $option->[1];
+	my $argument = $option->[2];
+
+	my @formats;
+
+	for my $flag (@{$option->[0]}) {
+		my $format;
+
+		if(length($flag) < 2) {
+			$format = '-' . $flag;
+			if($argument) {
+				$format .= ' ' . '?'; # $argument;
+			}
+		}
+		else {
+			$format = '--' . $flag;
+			if($argument) {
+				$format .= '=' . '?'; # $argument;
+			}
+		}
+
+		push @formats, $format;
+	}
+
+	return join('|', @formats);
+}
+
+
+sub _validate {
+	my ($self, $validate, $value) = @_;
+
+	if(ref($validate)) {
+		my $type = uc ref $validate;
+
+		if($type eq 'ARRAY') {
+			return grep { $_ eq $value } @{$validate};
+		}
+
+		elsif($type eq 'REGEXP' or $type eq 'SCALAR') {
+			$validate = qr/${$validate}/ if($type eq 'SCALAR');
+
+			return $value =~ $validate;
+		}
+
+		elsif($type eq 'HASH') {
+			# Don't know what to do with hashes yet.
+		}
+
+		elsif($type eq 'CODE') {
+			return &{$validate}($value);
+		}
+	}
+
+	return !0;
 }
 
 
@@ -145,7 +242,9 @@ sub run {
 	return &{$code}($action, $self->{parsed}, $self->{rest});
 }
 
+
 !0;
+
 
 __END__
 
@@ -163,7 +262,7 @@ CLI::Application - create command line tools with less code
 		fallback => 'help',
 		options => [
 			[ [ qw( v verbose ) ], 'Be more verbose.' ],
-			[ [ qw( f file ) ], 'Use the given file.', 'string' ],
+			[ [ qw( f file ) ], 'Use the given file.', sub { -f $_[0] }, 'File does not exist.' ],
 		],
 	);
 
