@@ -8,6 +8,7 @@ use Net::Interface;
 use Carp;
 use IO::File;
 
+our $VERSION = '0.01';
 
 our @ISA = qw( Net::Interface );
 
