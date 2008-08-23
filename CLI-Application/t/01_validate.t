@@ -10,7 +10,6 @@ use CLI::Application;
 my $cli = new CLI::Application(
 	name => 'test',
 	version => '0.01',
-	fallback => 'main',
 	options => [
 		# Any argument is fine.
 		[ [ qw( v value ) ], 'Option with argument.', !0 ],
@@ -64,4 +63,5 @@ SKIP: {
 	ok($@ =~ /not foo or bar/, 'not foo or bar');
 }
 
-sub main {}
+sub main : Command("Foo!") : Fallback {
+}

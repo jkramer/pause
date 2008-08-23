@@ -1,0 +1,345 @@
+#!/usr/bin/perl
+# Task, Copyright (C) 2007-2008 by Jonas Kramer. All rights reserved.
+# Published under the terms of the GNU General Public License (GPL).
+
+use strict;
+use warnings;
+
+use lib '/home/jkramer/source/pause/CLI-Application/lib/';
+
+use CLI::Application;
+use File::Slurp qw( slurp );
+
+my $app = new CLI::Application(
+	name => 'task',
+	version => '0.03',
+	options => [
+		[ [ qw( p project ), ], 'Project.', qr/^[a-z-]+$/, ],
+		[ [ qw( i priority ) ], 'Priority.', [ qw( high low normal none ) ] ],
+		[ [ qw( d duration ) ], 'Estimated duration.', \&duration ],
+		[ [ qw( c context ) ], 'Task context.', qr/^[a-z-]+$/, ],
+		[ [ qw( f follow ) ], 'Follow task.', qr/^\d+$/, ],
+	],
+);
+
+our %rc = (
+	taskfile => $ENV{HOME} . '/.tasks/tasks',
+	colors => {
+		high   => "\e[1;31m",
+		normal => "\e[0;32m",
+		low    => "\e[1;34m",
+		none   => "\e[1;37m",
+	},
+	# ...
+);
+
+
+my %tasks;
+my $writeback = 0;
+
+# Read the task file if it exists.
+if($rc{taskfile} and -r $rc{taskfile}) {
+	%tasks = &load($rc{taskfile});
+	&verify(\%tasks);
+}
+
+$app->prepare(@ARGV);
+$app->dispatch;
+
+&writeback($rc{taskfile}, values(%tasks)) if $writeback;
+
+
+sub parse {
+	my ($line, $error) = @_;
+	my %task;
+	my @text;
+
+	my %rules = (
+		# Parse duration (matches "1h45m", "1h" or "45m").
+		qr/^d:(?:(\d+)h(?:(\d+)m)?|(\d+)m)$/ => sub {
+			$task{duration} = ($3 or (($1 * 60) + ($2 or 0)));
+		},
+
+		# Parse contexts ("@work", "@home", etc.).
+		qr/^\@([a-z]+)$/i => sub {
+			$task{contexts} ||= [];
+			push @{$task{contexts}}, lc $1;
+		},
+
+		# Priority.
+		qr/^\+:(none|low|normal|high)(!done)?$/i => sub {
+			$task{priority} = lc $1;
+			$task{done} = !(!$2);
+		},
+
+		qr/^p:([a-z-]+)$/i => 'project',
+		qr/^n:(\d+)$/ => 'id',
+
+		qr/^f:(\d+)$/ => 'follow',
+	);
+
+	for my $chunk (split /\s+/, $line) {
+		my $match = 0;
+		for(keys(%rules)) {
+			if($chunk =~ $_) {
+				my $rule = $rules{$_};
+
+				ref($rule) eq 'CODE' ? &$rule : ($task{$rule} = lc $1);
+
+				$match = !0;
+				last;
+			}
+		}
+
+		push(@text, $chunk) unless($match);
+	}
+
+	$task{text} = join(" ", @text);
+
+	${$error} = "Need at least a task description!"
+		if(!$task{text} and ref($error));
+
+	return %task;
+}
+
+
+sub load {
+	my $path = shift;
+
+	my $line = 0;
+	my %tasks;
+
+	for(slurp($path)) {
+		my $error = undef;
+		my %task = &parse($_, \$error);
+
+		++$line;
+
+		die "Task file ($path) broken in line $line.\n" if $error;
+
+		$tasks{$task{id}} = \%task;
+	}
+
+	return %tasks;
+}
+
+
+sub writeback {
+	my ($path, @tasks) = @_;
+
+	my %format = (
+		contexts => sub {
+			return join(' ', map { '@' . $_ } @{+shift});
+		},
+
+		duration => sub {
+			my $duration = shift;
+			my ($h, $m) = (int($duration / 60), $duration % 60);
+			return "d:${h}h${m}m";
+		},
+
+		project => sub {
+			return 'p:' . lc shift;
+		},
+
+		id => 'n',
+		priority => '+',
+		follow => 'f',
+	);
+
+	open(my $taskfile, '>', $path) or die("Can't write task file. $!.\n");
+
+	for my $task (@tasks) {
+		my %task = %{$task};
+
+		$task{priority} ||= 'none';
+		$task{priority} .= '!done' if $task{done};
+
+		my @line;
+
+		while(my ($k, $v) = each %task) {
+			next unless exists($format{$k}) and defined($v);
+			push @line, ref $format{$k} ? &{$format{$k}}($v) : "$format{$k}:$v";
+		}
+
+		push(@line, $task{text});
+		print $taskfile "@line\n";
+	}
+
+	close($taskfile);
+}
+
+
+sub list : Command("List tasks.") : Fallback {
+	my ($action, $options, $arguments) = @_;
+
+	my @tasks = map { { %$_ } } grep { ! $_->{done} } values(%tasks);
+
+	# Search for string in task description.
+	my $text = join(' ', @{$arguments || []});
+	@tasks = grep { index($_->{text}, $text) > -1 } @tasks if $text;
+
+	# Filter other options.
+	for my $option (grep { length($_) >= 2 } keys %{$options}) {
+		@tasks = grep { $_->{$option} ~~ $options->{$option} } @tasks;
+	}
+
+	my %priorities = ( high => '+', normal => '=', low => '-', none => '.' );
+
+	for(sort { &prionum($b) <=> &prionum($a) } @tasks) {
+		next if $_->{follow} and not $tasks{$_->{follow}}->{done};
+
+		my $color = &color($_->{priority});
+
+		$_->{id} = sprintf '%3d', $_->{id};
+		$_->{priority} = sprintf $color . "[%s]\e[0m", $priorities{$_->{priority}};
+
+		print ' ', $_->{id}, ' ', $_->{priority}, ' ', $_->{text};
+
+		print " \e[1;30m(@{$_->{contexts}})\e[0m" if(ref $_->{contexts} eq 'ARRAY');
+		print " \e[1;30m[\e[1;34m$_->{project}\e[1;30m]\e[0m" if $_->{project};
+
+		print "\n";
+	}
+}
+
+
+sub add : Command("Add a new task.") {
+	my ($action, $options, $arguments) = @_;
+
+	die "Need at least a description.\n" unless @{$arguments};
+
+	my %task = &taskify(%{$options});
+	while(my ($k, $v) = each %task) {
+		delete $task{$k} if(length($k) < 2);
+	}
+
+	my $id = &nextid;
+	$tasks{$task{id} = $id} = \%task;
+
+	$writeback = !0;
+}
+
+
+sub done : Command("Mark task as done.") {
+	my ($action, $options, $arguments) = @_;
+
+	for(@{$arguments}) {
+		if(exists $tasks{$_}) {
+			$tasks{$_}->{done} = !0;
+			$writeback = !0;
+		}
+		else {
+			warn("Task $_ does not exist.\n");
+		}
+	}
+}
+
+
+sub remove : Command("Remove task.") {
+	my ($action, $options, $arguments) = @_;
+
+	for(@{$arguments}) {
+		if(!exists($tasks{$_})) {
+			warn "Task $_ does not exist.\n";
+		}
+		else {
+			delete $tasks{$_};
+			$writeback = !0;
+		}
+	}
+}
+
+
+sub update : Command("Update a task.") {
+	my ($action, $options, $arguments) = @_;
+
+
+	for my $id (@{$arguments}) {
+		if(!exists($tasks{$id})) {
+			warn("Task $id not in database.\n");
+			next;
+		}
+
+		my %task = &parse("@_");
+		delete $task{text} unless $task{text};
+
+		if(%task) {
+			while(my ($key, $value) = each %task) {
+				$tasks{$id}->{$key} = $task{$key};
+			}
+
+			$writeback = !0;
+		}
+	}
+}
+
+
+sub nextid {
+	exists $tasks{$_} or return $_ for(0 .. keys %tasks);
+}
+
+
+sub archive : Command("Archive done tasks.") {
+	warn "WARNING: The archive function may cause inconsistency ATM.\n";
+
+	&writeback(
+		$rc{taskfile} . '-archive-' . time,
+		grep { $_->{done} } values %tasks
+	);
+
+	&writeback($rc{taskfile}, grep { ! $_->{done} } values %tasks);
+}
+
+
+sub verify {
+	my $list = shift;
+
+	for my $task (grep { $_->{follow} } values %$list) {
+		my $follow = $task->{follow};
+		if(!exists $tasks{$follow}) {
+			warn "Removing dead relation [$task->{id} => $follow].\n";
+			delete $task->{follow};
+		}
+	}
+}
+
+
+sub duration {
+	my ($duration) = @_;
+
+	# Parse duration (matches "1h45m", "1h" or "45m").
+	if($duration =~ /^(?:(\d+)h(?:(\d+)m)?|(\d+)m)$/) {
+		return ($3 or (($1 * 60) + ($2 or 0)));
+	}
+	else {
+		return;
+	}
+}
+
+
+sub prionum {
+	my $priority = shift;
+	$priority = $priority->{priority} || 'none';
+	my %priorities = (none => 0, low => 1, normal => 2, high => 3);
+
+	return $priorities{$priority} || 0;
+}
+
+
+sub color {
+	my $priority = shift || 'none';
+	$priority = 'none' if $priority !~ /^none|low|normal|high$/;
+
+	return $rc{colors}->{$priority};
+}
+
+
+sub taskify {
+	my (%task) = @_;
+
+	$task{duration} = &duration($task{duration});
+	$task{contexts} = [ split /,+/,$task{context} ] if($task{context});
+
+	return %task;
+}
