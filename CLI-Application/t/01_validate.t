@@ -64,4 +64,5 @@ SKIP: {
 }
 
 sub main : Command("Foo!") : Fallback {
+	my ($app) = @_;
 }
