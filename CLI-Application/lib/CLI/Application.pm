@@ -10,7 +10,7 @@ use Carp;
 use Module::Pluggable;
 use Module::Load;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 our %ACTION;
 our $FALLBACK;
@@ -336,6 +336,13 @@ sub AUTOLOAD {
 	croak "Unknown method '$method' in ", ref($self) unless $module;
 
 	return $module->$method($self, @_);
+}
+
+
+sub DESTROY {
+	my ($self) = @_;
+
+	delete $self->{plugged};
 }
 
 
