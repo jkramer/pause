@@ -4,14 +4,17 @@ package CLI::Application;
 use strict;
 use warnings;
 
-use Carp;
 use Attribute::Handlers;
 use Text::Table;
+use Carp;
+use Module::Pluggable;
+use Module::Load;
 
 our $VERSION = '0.01';
 
 our %ACTION;
 our $FALLBACK;
+our $AUTOLOAD;
 
 
 sub new {
@@ -26,6 +29,26 @@ sub prepare {
 	my $wanted = $self->{options} || [];
 	my @rest;
 	my %option;
+
+	my %plugin = map { $_ => 0 } $self->plugins;
+
+	$self->{plugged} = {};
+
+	# Load plugins.
+	if($self->{plugins}) {
+		for my $plugin (@{$self->{plugins}}) {
+			my $package = ref($self) . '::Plugin';
+			$plugin = ref($self) . '::Plugin::' . $plugin if($plugin !~ /^$package/);
+
+			die "Plugin $plugin not found.\n" unless exists($plugin{$plugin});
+
+			load $plugin;
+
+			my $instance = $plugin->new;
+
+			$self->{plugged}->{$_} = $instance for($plugin->export);
+		}
+	}
 
 	while(my $arg = shift(@argv)) {
 
@@ -121,19 +144,6 @@ sub prepare {
 }
 
 
-sub _option {
-	my ($self, $needle) = @_;
-
-	my $list = $self->{options} || [];
-
-	for my $option (@$list) {
-		return $option if grep { $_ eq $needle } @{$option->[0]};
-	}
-
-	die $self->usage("Unknown option '$needle'.\n");
-}
-
-
 sub usage {
 	my ($self, @message) = @_;
 
@@ -144,6 +154,49 @@ sub usage {
 
 	return $usage . "\n";
 }
+
+
+sub action {
+	my ($self, $action) = @_;
+
+	if(defined $action and !$ACTION{$action}) {
+		die "Unknown action '$action'.\n";
+	}
+
+	$self->{action} = $action if(defined $action);
+
+	return $self->{action};
+}
+
+
+sub option {
+	my ($self, $option, $argument) = @_;
+
+	if(@_ == 3) {
+		$self->{parsed}->{$option} = $argument;
+	}
+
+	return $self->{parsed}->{$option};
+}
+
+
+sub dispatch {
+	my ($self, $action) = @_;
+
+	$action ||= $self->action || $FALLBACK;
+
+	my $code = $ACTION{$action}->{code};
+
+	return &{$code}($self) if($code);
+
+	die "Nothing to do.\n";
+}
+
+
+sub name { $_[0]->{name} }
+
+
+sub arguments { return @{$_[0]->{rest}} }
 
 
 sub _usage {
@@ -213,6 +266,19 @@ sub _option_usage {
 }
 
 
+sub _option {
+	my ($self, $needle) = @_;
+
+	my $list = $self->{options} || [];
+
+	for my $option (@$list) {
+		return $option if grep { $_ eq $needle } @{$option->[0]};
+	}
+
+	die $self->usage("Unknown option '$needle'.\n");
+}
+
+
 sub _validate_option {
 	my ($self, $validate, $value) = @_;
 
@@ -242,50 +308,6 @@ sub _validate_option {
 }
 
 
-sub action {
-	my ($self, $action) = @_;
-
-	if(defined $action and !$ACTION{$action}) {
-		die "Unknown action '$action'.\n";
-	}
-
-	$self->{action} = $action if(defined $action);
-
-	return $self->{action};
-}
-
-
-sub option {
-	my ($self, $option, $argument) = @_;
-
-	if(@_ == 3) {
-		$self->{parsed}->{$option} = $argument;
-	}
-
-	return $self->{parsed}->{$option};
-}
-
-
-sub arguments {
-	my ($self) = @_;
-
-	return @{$self->{rest}};
-}
-
-
-sub dispatch {
-	my ($self, $action) = @_;
-
-	$action ||= $self->action || $FALLBACK;
-
-	my $code = $ACTION{$action}->{code};
-
-	return &{$code}($self) if($code);
-
-	die "Nothing to do.\n";
-}
-
-
 sub UNIVERSAL::Command : ATTR(CODE) {
 	my ($package, $symbol, $code, $attribute, $data, $phase) = @_;
 
@@ -302,6 +324,18 @@ sub UNIVERSAL::Fallback : ATTR(CODE) {
 	my ($package, $symbol, $code, $attribute, $data, $phase) = @_;
 
 	$FALLBACK = *{$symbol}{NAME};
+}
+
+
+sub AUTOLOAD {
+	my $self = shift;
+
+	my ($method) = (split /::/, $AUTOLOAD)[-1];
+	my $module = $self->{plugged}->{$method};
+
+	croak "Unknown method '$method' in ", ref($self) unless $module;
+
+	return $module->$method($self, @_);
 }
 
 
@@ -325,6 +359,7 @@ CLI::Application - (not yet) extensible CLI application framework
 			[ [ qw( a any ) ], 'Option with any argument.', 1 ],
 			[ [ qw( f foobar ) ], 'Option with argument foo or bar.', [qw(foo bar)] ],
 		],
+		plugins => [ qw( RC::YAML ) ],
 	);
 
 	sub list : Command('Show list of items.') : Fallback {
@@ -398,7 +433,8 @@ is invalid, the value will be added to the error message printed to the user.
 
 =item B<plugins>
 
-NOT IMPLEMENTED YET. This will be a list of plugins to load.
+Names of plugins to load. See L<CLI::Application::Plugin> to learn how to
+write/use plugins.
 
 =back
 
@@ -428,6 +464,10 @@ Returns a list of arguments. DON'T USE BEFORE A CALL TO B<prepare>.
 Getter/setter for the command that B<CLI::Application> is going to execute. Use
 this after a call to B<prepare> to find out what B<CLI::Application> thinks is
 the action the user wants to execute, or to overwrite it. See B<dispatch>.
+
+=item B<name>
+
+Returns the application name.
 
 =item B<usage>(message)
 
