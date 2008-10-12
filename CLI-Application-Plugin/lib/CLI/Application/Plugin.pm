@@ -4,7 +4,21 @@ package CLI::Application::Plugin;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
+
+
+sub new {
+	my ($class, %param) = @_;
+	return bless \%param, $class;
+}
+
+
+sub export {
+	my $class = shift;
+	$class = ref($class) if ref($class);
+	die "Method 'export' must be overwritten in $class!\n";
+}
+
 
 !0;
 
@@ -31,7 +45,7 @@ CLI::Application::Plugin
 
 	sub hello {
 		my ($self, $application) = @_;
-		print "Moo!\n";
+		print "Moo! arg1 = $self->{arg1}\n";
 	}
 
 	-----
@@ -40,7 +54,17 @@ CLI::Application::Plugin
 
 	my $application = new CLI::Application(
 		...
-		plugins => [ qw( UsefulPlugin ) ],
+		plugins => {
+			UsefulPlugin => {
+				arg1 => 'foo',
+				arg2 => 'bar',
+			},
+			# Will result in:
+			# $plugin = new CLI::Application::Plugin::UsefulPlugin(
+			# 	arg1 => 'foo',
+			# 	arg2 => 'bar',
+			# )
+		},
 		...
 	);
 
@@ -62,6 +86,8 @@ name relative to B<CLI::Application::Plugin>.
 To write your own plugins, use the namespace B<CLI::Application::Plugin>. Just
 write your methods and add another method named B<export> that returns a list
 with the names of the methods you want to plug into B<CLI::Application>. Make
-sure you don't overwrite anything!
+sure you don't overwrite anything! You may want to override the B<new> method
+though. The default one values given in the setup hash and puts the in
+the object.
 
 =cut
