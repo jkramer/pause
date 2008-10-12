@@ -34,7 +34,9 @@ sub rc {
 
 
 sub _find_rc {
-	my ($self, $basename) = @_;
+	my ($self, $name) = @_;
+
+	my $basename = $name . '.rc';
 
 	for("$ENV{HOME}/.", '/etc/') {
 		my $path = $_ . $basename;
@@ -58,11 +60,11 @@ __END__
 
 =head1 NAME
 
-CLI::Application::Plugin::RC::YAML
+CLI::Application::Plugin::RC
 
 =head1 SYNOPSIS
 
-	use CLI::Application::Plugin::YAML;
+	use CLI::Application::Plugin::RC::YAML;
 
 	use strict;
 	use warnings;
