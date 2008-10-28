@@ -19,7 +19,7 @@ sub _load_rc {
 
 	my %rc;
 
-	tie %rc, 'Tie::File::Hashify', parse => \&_parse;
+	tie %rc, 'Tie::File::Hashify', $path, parse => \&_parse;
 
 	$self->{rc} = { %rc };
 }
@@ -32,7 +32,7 @@ sub _parse {
 
 	$line =~ s/#.*$//;
 	
-	if($line =~ /\s*(\S+)\s*=\s*(.*?)\s*/) {
+	if($line =~ /^\s*(\S+)\s*=\s*(.*?)\s*$/) {
 		return ($1, $2);
 	}
 
