@@ -38,7 +38,7 @@ sub _find_rc {
 
 	my $basename = $name . '.rc';
 
-	for("$ENV{HOME}/.", '/etc/') {
+	for("$ENV{HOME}/.", "$ENV{HOME}/.$name/", '/etc/') {
 		my $path = $_ . $basename;
 		return $path if(-r $path);
 	}
