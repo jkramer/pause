@@ -252,7 +252,7 @@ sub _usage {
 sub _option_usage {
 	my ($self) = @_;
 
-	if(@{$self->{options}}) {
+	if($self->{options} and @{$self->{options}}) {
 		my $table = new Text::Table;
 
 		for my $option (@{$self->{options}}) {
