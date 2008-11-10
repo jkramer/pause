@@ -1,4 +1,3 @@
-
 use Module::Build;
 
 my $build = new Module::Build(
@@ -8,6 +7,7 @@ my $build = new Module::Build(
 		perl => '5.8.5',
 		'Text::Table' => 0,
 		'Attribute::Handlers' => 0,
+		'Module::Load' => 0,
 	},
 );
 
