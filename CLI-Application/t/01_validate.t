@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 10;
+use Test::More tests => 5;
 
 use CLI::Application;
 
@@ -34,29 +34,29 @@ SKIP: {
 	ok($@, 'missing argument');
 }
 
-ok($cli->prepare('-F', $0), 'file existing');
+$cli->prepare('-F', $0);
 
 SKIP: {
 	eval { $cli->prepare(qw(-F file_that_hopefully_does_not_exist)) };
 	ok($@ =~ /not existing/, 'file not existing');
 }
 
-ok($cli->prepare(qw(-n 15)), 'numeric regexp');
+$cli->prepare(qw(-n 15));
 
 SKIP: {
 	eval { $cli->prepare(qw(-n abc)) };
 	ok($@ =~ /not numeric/, 'not numeric regexp');
 }
 
-ok($cli->prepare(qw(-N 15)), 'numeric scalar');
+$cli->prepare(qw(-N 15));
 
 SKIP: {
 	eval { $cli->prepare(qw(-N abc)) };
 	ok($@ =~ /not numeric/, 'not numeric scalar');
 }
 
-ok($cli->prepare(qw(-f foo)), 'foo');
-ok($cli->prepare(qw(-f bar)), 'bar');
+$cli->prepare(qw(-f foo));
+$cli->prepare(qw(-f bar));
 
 SKIP: {
 	eval { $cli->prepare(qw(-f baz)) };
