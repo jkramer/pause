@@ -145,20 +145,10 @@ sub prepare {
 		}
 	}
 
-	# Get command from remaining arguments or take default action.
-	my $command = (shift @rest) || $FALLBACK;
+	$self->{parsed} = \%option;
+	$self->{rest} = \@rest;
 
-	die $self->usage("No action.") unless $command;
-
-	if($ACTION{$command}) {
-		$self->action($command);
-
-		$self->{parsed} = \%option;
-		$self->{rest} = \@rest;
-	}
-	else {
-		die $self->usage("No such command.");
-	}
+	delete $self->{action};
 }
 
 
@@ -183,7 +173,22 @@ sub action {
 		die "Unknown action '$action'.\n";
 	}
 
-	$self->{action} = $action if(defined $action);
+	if(defined $action) {
+		$self->{action} = $action;
+	}
+	elsif(!$self->{action}) {
+		# Get command from remaining arguments or take default action.
+		my $command = (shift @{$self->{rest}}) || $FALLBACK;
+
+		die $self->usage("No action.") unless $command;
+
+		if($ACTION{$command}) {
+			$self->{action} = $command;
+		}
+		else {
+			die $self->usage("No such command.");
+		}
+	}
 
 	return $self->{action};
 }
