@@ -500,11 +500,11 @@ B<CLI::Application> will die with an error.
 
 =item B<option>(option, argument)
 
-This is the getter/setter for options. DON'T USE BEFORE A CALL TO B<prepare>.
+This is the getter/setter for options.
 
 =item B<arguments>
 
-Returns a list of arguments. DON'T USE BEFORE A CALL TO B<prepare>.
+Returns a list of arguments.
 
 =item B<action>(action)
 
